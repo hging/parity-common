@@ -137,7 +137,7 @@ impl Secret {
 	pub fn dec(&mut self) -> Result<(), Error> {
 		match self.is_zero() {
 			true => {
-				*self = Self::copy_from_slice(&super::MINUS_ONE_KEY)
+				*self = Secret::try_from(super::MINUS_ONE_KEY)
 					.expect("Constructing a secret key from a known-good constant works; qed.");
 				Ok(())
 			}
@@ -212,6 +212,13 @@ impl Secret {
 	}
 }
 
+impl FromStr for Secret {
+	type Err = Error;
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(H256::from_str(s).map_err(|e| Error::Custom(format!("{:?}", e)))?.into())
+	}
+}
+
 impl From<[u8; 32]> for Secret {
 	#[inline(always)]
 	fn from(mut k: [u8; 32]) -> Self {
@@ -237,6 +244,25 @@ impl From<key::SecretKey> for Secret {
 		a.copy_from_slice(&key[0..SECP256K1_SECRET_KEY_SIZE]);
 		ZeroizeSecretKey(key).zeroize();
 		a.into()
+	}
+}
+
+impl TryFrom<&str> for Secret {
+	type Error = Error;
+
+	fn try_from(s: &str) -> Result<Self, Error> {
+		s.parse().map_err(|e| Error::Custom(format!("{:?}", e)))
+	}
+}
+
+impl TryFrom<&[u8]> for Secret {
+	type Error = Error;
+
+	fn try_from(b: &[u8]) -> Result<Self, Error> {
+		if b.len() != SECP256K1_SECRET_KEY_SIZE {
+			return Err(Error::InvalidSecretKey);
+		}
+		Ok(Self { inner: Box::new(H256::from_slice(b)) })
 	}
 }
 
